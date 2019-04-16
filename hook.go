@@ -8,7 +8,7 @@ import (
 
 	"github.com/gchaincl/sqlhooks"
 	"github.com/go-sql-driver/mysql"
-	"github.com/libgo/log"
+	"github.com/libgo/logx"
 )
 
 const (
@@ -34,7 +34,7 @@ func (h *Hook) After(ctx context.Context, query string, args ...interface{}) (co
 		return ctx, nil
 	}
 
-	logger := log.KVPair(map[string]interface{}{
+	logger := logx.KVPair(map[string]interface{}{
 		"span": "sql",
 		"took": nanoToMs(time.Since(startAt).Nanoseconds()),
 	})
