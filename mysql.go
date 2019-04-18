@@ -3,7 +3,11 @@ package mysqlx
 import (
 	"database/sql"
 	"fmt"
+	"os"
+	"strconv"
+	"strings"
 	"sync"
+	"time"
 
 	"github.com/go-sql-driver/mysql"
 	"github.com/jmoiron/sqlx"
@@ -25,6 +29,29 @@ var bag = sync.Map{}
 // Register dsn format -> [username[:password]@][protocol[(address)]]/dbname[?param1=value1&...&paramN=valueN]
 // each db should only register once.
 func Register(name string, conf Conf) {
+	// override if exist in env
+	if s := os.Getenv("MYSQL_DSN_" + strings.ToUpper(name)); s != "" {
+		conf.DSN = s
+	}
+	if s := os.Getenv("MYSQL_MAXOPEN_" + strings.ToUpper(name)); s != "" {
+		d, err := strconv.Atoi(s)
+		if err == nil {
+			conf.MaxOpenConns = d
+		}
+	}
+	if s := os.Getenv("MYSQL_MAXIDLE_" + strings.ToUpper(name)); s != "" {
+		d, err := strconv.Atoi(s)
+		if err == nil {
+			conf.MaxIdleConns = d
+		}
+	}
+	if s := os.Getenv("MYSQL_CONNMAXLIFE_" + strings.ToUpper(name)); s != "" {
+		d, err := time.ParseDuration(s)
+		if err != nil {
+			conf.ConnMaxLifetime = d
+		}
+	}
+
 	db := conf.initialize()
 	bag.LoadOrStore(name, db) // using load or store to prevent duplicate register.
 }
