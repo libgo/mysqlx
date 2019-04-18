@@ -51,6 +51,9 @@ func Register(name string, conf Conf) {
 			conf.ConnMaxLifetime = d
 		}
 	}
+	if s := os.Getenv("MYSQL_HOOKOFF_" + strings.ToUpper(name)); s == "true" || s == "TRUE" || s == "True" || s == "1" {
+		conf.HookDisable = true
+	}
 
 	db := conf.initialize()
 	bag.LoadOrStore(name, db) // using load or store to prevent duplicate register.
