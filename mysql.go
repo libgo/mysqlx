@@ -22,13 +22,11 @@ type (
 	NullTime    = mysql.NullTime
 )
 
-// var store = safemap.New()
-
 var bag = sync.Map{}
 
 // Register dsn format -> [username[:password]@][protocol[(address)]]/dbname[?param1=value1&...&paramN=valueN]
 // each db should only register once.
-func Register(name string, conf Conf) {
+func Register(name string, conf Conf) *sqlx.DB {
 	// override if exist in env
 	if s := os.Getenv("MYSQL_DSN_" + strings.ToUpper(name)); s != "" {
 		conf.DSN = s
@@ -57,6 +55,7 @@ func Register(name string, conf Conf) {
 
 	db := conf.initialize()
 	bag.LoadOrStore(name, db) // using load or store to prevent duplicate register.
+	return db
 }
 
 // Client returns mysql client, mostly, we use DB() func
