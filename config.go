@@ -13,10 +13,10 @@ type Conf struct {
 	MaxIdleConns    int                 // ==0, set to 64, <0 no idle connections are retained
 	ConnMaxLifetime time.Duration       // ==0, set to 15m, <0 connections are reused forever
 	MapperFunc      func(string) string // struct field name convert
-	HookDisable     bool
+	HookEnable      bool                // enable sql hook
 }
 
-func (c *Conf) initialize() *sqlx.DB {
+func (c *Conf) initialize() *DB {
 	if c.MaxOpenConns == 0 {
 		c.MaxOpenConns = 512
 	}
@@ -30,13 +30,12 @@ func (c *Conf) initialize() *sqlx.DB {
 		c.MapperFunc = snakecase
 	}
 
-	var db *sqlx.DB
+	var db *DB
 	var err error
-	if c.HookDisable {
-		db, err = sqlx.Open("mysql", c.DSN)
-	} else {
-		// should register related driver in init func
+	if c.HookEnable {
 		db, err = sqlx.Open(driverName, c.DSN)
+	} else {
+		db, err = sqlx.Open("mysql", c.DSN)
 	}
 	if err != nil {
 		panic(err)

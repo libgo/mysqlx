@@ -15,19 +15,20 @@ import (
 
 // alias
 type (
+	DB          = sqlx.DB
 	NullBool    = sql.NullBool
 	NullInt64   = sql.NullInt64
 	NullFloat64 = sql.NullFloat64
 	NullString  = sql.NullString
 	NullTime    = mysql.NullTime
+	MySQLError  = mysql.MySQLError
 )
 
-var bag = sync.Map{}
+var bag = &sync.Map{}
 
 // Register dsn format -> [username[:password]@][protocol[(address)]]/dbname[?param1=value1&...&paramN=valueN]
 // each db should only register once.
-func Register(name string, conf Conf) *sqlx.DB {
-	// override if exist in env
+func Register(name string, conf Conf) *DB {
 	if s := os.Getenv("MYSQL_DSN_" + strings.ToUpper(name)); s != "" {
 		conf.DSN = s
 	}
@@ -49,27 +50,27 @@ func Register(name string, conf Conf) *sqlx.DB {
 			conf.ConnMaxLifetime = d
 		}
 	}
-	if s := os.Getenv("MYSQL_HOOKOFF_" + strings.ToUpper(name)); s == "true" || s == "TRUE" || s == "True" || s == "1" {
-		conf.HookDisable = true
+	if s := os.Getenv("MYSQL_HOOK_" + strings.ToUpper(name)); s == "true" || s == "TRUE" || s == "True" || s == "1" {
+		conf.HookEnable = true
 	}
-
+	// override if exist in env
 	db := conf.initialize()
 	bag.LoadOrStore(name, db) // using load or store to prevent duplicate register.
 	return db
 }
 
-// Client returns mysql client, mostly, we use DB() func
-func Client(name string) (*sqlx.DB, error) {
+// Client returns mysql client, mostly, we use Use() func
+func Client(name string) (*DB, error) {
 	v, ok := bag.Load(name)
 	if !ok {
 		return nil, fmt.Errorf("mysql %q not registered", name)
 	}
 
-	return v.(*sqlx.DB), nil
+	return v.(*DB), nil
 }
 
-// DB is helper func to get *sqlx.DB
-func DB(name string) *sqlx.DB {
+// Use is helper func to get *DB
+func Use(name string) *DB {
 	cli, _ := Client(name)
 	return cli
 }
@@ -79,7 +80,7 @@ func HealthCheck() error {
 	errs := make(map[string]error)
 
 	bag.Range(func(k, v interface{}) bool {
-		if err := v.(*sqlx.DB).Ping(); err != nil {
+		if err := v.(*DB).Ping(); err != nil {
 			errs[k.(string)] = err
 		}
 		return true
@@ -95,7 +96,7 @@ func HealthCheck() error {
 // Close closes all mysql conn, TODO maybe we should return close err.
 func Close() error {
 	bag.Range(func(k, v interface{}) bool {
-		v.(*sqlx.DB).Close()
+		v.(*DB).Close()
 		return true
 	})
 	return nil
@@ -118,12 +119,12 @@ var (
 	NamedQueryContext = sqlx.NamedQueryContext
 )
 
-// MySQLErr try conver mysql err to *mysql.MySQLError
-func MySQLErr(err error) *mysql.MySQLError {
+// MySQLErr try conver mysql err to *MySQLError
+func MySQLErr(err error) *MySQLError {
 	if err == nil {
 		return nil
 	}
-	if e, ok := err.(*mysql.MySQLError); ok {
+	if e, ok := err.(*MySQLError); ok {
 		return e
 	}
 	return nil
@@ -134,20 +135,11 @@ func IsNoRowsErr(err error) bool {
 	return err == sql.ErrNoRows
 }
 
-const (
-	ER_DUP_ENTRY = 1062
-)
-
 // IsDupErr check if mysql error is ER_DUP_ENTRY
 // https://github.com/VividCortex/mysqlerr
 func IsDupErr(err error) bool {
 	e := MySQLErr(err)
-	return e != nil && e.Number == ER_DUP_ENTRY
-}
-
-var ErrAff = &e{
-	code: 1404,
-	msg:  "RowsAffected is 0",
+	return e != nil && e.Number == 1062
 }
 
 type e struct {
@@ -155,20 +147,20 @@ type e struct {
 	msg  string
 }
 
-func (e *e) Code() uint32 {
+func (e e) Code() uint32 {
 	return e.code
 }
 
-func (e *e) Message() string {
+func (e e) Message() string {
 	return e.msg
 }
 
-func (e *e) Error() string {
+func (e e) Error() string {
 	return fmt.Sprintf("[%d]%s", e.code, e.msg)
 }
 
-// IsChanged checks if result.RowsAffected is 0
-func IsChanged(result sql.Result, err error) error {
+// IsUnChanged checks if result.RowsAffected is 0
+func IsUnChanged(result sql.Result, err error) error {
 	if err != nil {
 		return err
 	}
@@ -179,7 +171,10 @@ func IsChanged(result sql.Result, err error) error {
 	}
 
 	if aff == 0 {
-		return ErrAff
+		return e{
+			code: 10404,
+			msg:  "RowsAffected is 0",
+		}
 	}
 
 	return nil
