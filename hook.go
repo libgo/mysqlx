@@ -45,6 +45,10 @@ func (h *Hook) After(ctx context.Context, query string, args ...interface{}) (co
 
 	if logger.DebugEnabled() {
 		logger.Debugf("> %s. %v", query, args)
+		if soarEnable {
+			out, _ := soar(query)
+			logger.Debugf("%s", out)
+		}
 	}
 
 	return ctx, nil
