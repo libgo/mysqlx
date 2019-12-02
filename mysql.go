@@ -53,9 +53,20 @@ func Register(name string, conf Conf) *DB {
 	if s := os.Getenv("MYSQL_HOOK_" + strings.ToUpper(name)); s == "true" || s == "TRUE" || s == "True" || s == "1" {
 		conf.HookEnable = true
 	}
-	// override if exist in env
+
+	// check if exist
+	if db, ok := bag.Load(name); ok {
+		return db.(*DB)
+	}
+
 	db := conf.initialize()
-	bag.LoadOrStore(name, db) // using load or store to prevent duplicate register.
+
+	// using load or store to prevent duplicate register.
+	if act, loaded := bag.LoadOrStore(name, db); loaded {
+		db.Close()
+		return act.(*DB)
+	}
+
 	return db
 }
 
