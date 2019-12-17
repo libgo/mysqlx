@@ -183,7 +183,7 @@ func IsUnChanged(result sql.Result, err error) error {
 
 	if aff == 0 {
 		return e{
-			code: 10404,
+			code: 10304,
 			msg:  "RowsAffected is 0",
 		}
 	}
