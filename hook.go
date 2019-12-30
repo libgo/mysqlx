@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
-	"math"
 	"time"
 
 	"github.com/gchaincl/sqlhooks"
@@ -36,7 +35,7 @@ func (h *Hook) After(ctx context.Context, query string, args ...interface{}) (co
 
 	if logger.DebugEnabled() {
 		if startAt, ok := ctx.Value(sqlTimer{}).(time.Time); ok {
-			logger.KV("span", "sql", "took", nanoToMs(time.Since(startAt).Nanoseconds())).Debugf("> %s. %v", query, args)
+			logger.KV("span", "sql", "took", time.Since(startAt).Milliseconds()).Debugf("> %s. %v", query, args)
 		}
 	}
 
@@ -51,13 +50,8 @@ func (h *Hook) OnError(ctx context.Context, err error, query string, args ...int
 
 	if startAt, ok := ctx.Value(sqlTimer{}).(time.Time); ok {
 		logger := logx.FromContext(ctx)
-		logger.KV("span", "sql", "took", nanoToMs(time.Since(startAt).Nanoseconds())).Errorf("> %s. %v", query, args)
+		logger.KV("span", "sql", "took", time.Since(startAt).Milliseconds()).Errorf("> %s. %v", query, args)
 	}
 
 	return err
-}
-
-// convert nano to ms
-func nanoToMs(ns int64) float64 {
-	return math.Trunc((float64(ns)/float64(1000000)+0.5/1e2)*1e2) / 1e2
 }
